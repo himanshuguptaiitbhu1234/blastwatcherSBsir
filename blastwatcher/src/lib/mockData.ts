@@ -37,7 +37,8 @@ export const blastRecords = [
     distance: 350,
     buildingsPresent: true,
     measuredPPV: 12.5,
-    damageLevel: 'Minor'
+    damageLevel: 'Minor',
+    notes: "notes"
   },
   {
     id: 2,

@@ -9,6 +9,7 @@ import pymongo
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from bson import ObjectId
 
 # Load environment variables
 load_dotenv()
@@ -77,7 +78,7 @@ def get_blast_history():
         measurements = list(measurements_collection.find(
             {"mine": mine_name},
             {"_id": 0, "mine": 1, "date": 1, "time": 1, "location": 1, "measuredPPV": 1, "notes": 1}
-        ))
+        ).sort("date", -1))
         
         return jsonify({
             'success': True,
@@ -110,6 +111,7 @@ def save_measurement():
         result = measurements_collection.insert_one(measurement_data)
         
         return jsonify({
+            'success': True,
             'message': 'Measurement saved successfully',
             'inserted_id': str(result.inserted_id)
         }), 201
@@ -159,14 +161,107 @@ def predict():
             print(f"❌ MongoDB Insert Error: {e}")
 
         return jsonify({
+            'success': True,
             'predicted_ppv': predicted_ppv, 
             'predicted_sd': predicted_sd
         })
 
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
-    
 
+@app.route('/get-predictions', methods=['GET'])
+def get_predictions():
+    try:
+        mine_name = request.args.get('mine')
+        if not mine_name:
+            return jsonify({'error': 'Mine name is required'}), 400
+        
+        predictions = list(predictions_collection.find(
+            {"selected_mine": mine_name},
+            {"_id": 0, "SD": 1, "predicted_ppv": 1, "timestamp": 1}
+        ).sort("timestamp", 1))
+        
+        formatted_data = [{
+            "sd": point["SD"],
+            "ppv": point["predicted_ppv"]
+        } for point in predictions]
+        
+        return jsonify({
+            'success': True,
+            'data': formatted_data
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+@app.route('/delete-blast-record', methods=['DELETE'])
+def delete_blast_record():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+        mine = data.get('mine')
+        date = data.get('date')
+        time = data.get('time', '')
+        location = data.get('location')
+        
+        if not all([mine, date, location]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+            
+        query = {
+            "mine": mine,
+            "date": date,
+            "location": location
+        }
+        
+        if time:
+            query["time"] = time
+            
+        result = measurements_collection.delete_one(query)
+        
+        if result.deleted_count == 0:
+            return jsonify({
+                'success': False,
+                'error': 'Record not found',
+                'deleted_count': 0
+            }), 404
+            
+        return jsonify({
+            'success': True,
+            'message': 'Record deleted successfully',
+            'deleted_count': result.deleted_count
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Server error: {str(e)}'
+        }), 500
+
+@app.route('/delete-blast-records', methods=['DELETE'])
+def delete_all_blast_records():
+    try:
+        mine = request.args.get('mine')
+        if not mine:
+            return jsonify({
+                'success': False,
+                'error': 'Mine name is required'
+            }), 400
+            
+        result = measurements_collection.delete_many({"mine": mine})
+        
+        return jsonify({
+            'success': True,
+            'message': f'Deleted {result.deleted_count} records',
+            'deleted_count': result.deleted_count
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Server error: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

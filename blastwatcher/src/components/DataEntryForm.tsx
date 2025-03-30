@@ -85,7 +85,7 @@ const DataEntryForm = () => {
       date,
       time,
       location,
-      measuredPPV: parseFloat(measuredPPV),
+      measuredPPV: (measuredPPV),
       notes,
       timestamp: new Date().toISOString()
     };

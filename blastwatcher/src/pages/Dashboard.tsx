@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { blastRecords } from '@/lib/mockData';
 import BlastForm from '@/components/BlastForm';
 import DataEntryForm from '@/components/DataEntryForm';
-import { BarChart3, BookOpen, Database, Settings } from 'lucide-react';
+import { BarChart3, BookOpen, Database, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const mines = [
   { id: '1', name: 'Jayanta OCP' },
@@ -25,13 +35,26 @@ const mines = [
   { id: '3', name: 'Beena OCP' },
 ];
 
+interface BlastRecord {
+  id: number;
+  mineId: string;
+  date: string;
+  time: string;
+  location: string;
+  measuredPPV: number;
+  notes: string;
+  damageLevel: string;
+}
+
 const Dashboard = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('predict');
-  const [recentBlasts, setRecentBlasts] = useState(blastRecords);
+  const [recentBlasts, setRecentBlasts] = useState<BlastRecord[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<BlastRecord | null>(null);
+  const [deleteAllMode, setDeleteAllMode] = useState(false);
   
-  // Authentication states for history tab
   const [historyAuth, setHistoryAuth] = useState({
     isLoggedIn: false,
     username: '',
@@ -40,12 +63,10 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    // Redirect to login if not authenticated and not loading
     if (!isAuthenticated && !isLoading) {
       navigate('/login');
     }
 
-    // Check if already logged in for history tab
     const loggedIn = localStorage.getItem('historyLoggedIn');
     const savedMine = localStorage.getItem('selectedMine');
     if (loggedIn === 'true' && savedMine) {
@@ -58,48 +79,35 @@ const Dashboard = () => {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
-  // Update the loadBlastData function in your Dashboard component
+    // Also update your loadBlastData function to handle errors better:
 const loadBlastData = async (mine: string) => {
   try {
-    // First try to fetch from MongoDB
     const response = await fetch(`http://localhost:5000/get-blast-history?mine=${mine}`);
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.data.length > 0) {
-        // Transform MongoDB data to match your table structure
-        const formattedData = data.data.map((item: any, index: number) => ({
-          id: index + 1,
-          mineId: mines.find(m => m.name === item.mine)?.id || '1',
-          date: item.date,
-          location: item.location,
-          measuredPPV: item.measuredPPV,
-          damageLevel: getDamageLevel(item.measuredPPV),
-          notes: item.notes || ''
-        }));
-        setRecentBlasts(formattedData);
-        return;
-      }
+    if (!response.ok) {
+      throw new Error('Failed to fetch blast history');
     }
     
-    // Fallback to localStorage if MongoDB fails or returns no data
-    const storedData = localStorage.getItem('ppvMeasurements');
-    if (storedData) {
-      const allMeasurements = JSON.parse(storedData);
-      const filteredMeasurements = allMeasurements.filter((m: any) => m.mine === mine);
-      const formattedData = filteredMeasurements.map((item: any, index: number) => ({
-        id: index + 1,
-        mineId: mines.find(m => m.name === item.mine)?.id || '1',
-        date: item.date,
-        location: item.location,
-        measuredPPV: item.measuredPPV,
-        damageLevel: getDamageLevel(item.measuredPPV),
-        notes: item.notes || ''
-      }));
-      setRecentBlasts(formattedData);
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to load blast data');
     }
+
+    const formattedData = data.data.map((item: any, index: number) => ({
+      id: index + 1,
+      mineId: mines.find(m => m.name === item.mine)?.id || '1',
+      date: item.date,
+      time: item.time || '',
+      location: item.location,
+      measuredPPV: item.measuredPPV,
+      damageLevel: getDamageLevel(item.measuredPPV),
+      notes: item.notes || ''
+    }));
+    
+    setRecentBlasts(formattedData);
   } catch (error) {
     console.error('Error loading blast data:', error);
-    toast.error('Failed to load blast history');
+    toast.error(error.message || 'Failed to load blast history');
+    setRecentBlasts([]);
   }
 };
 
@@ -131,7 +139,78 @@ const loadBlastData = async (mine: string) => {
     });
     localStorage.removeItem('historyLoggedIn');
     localStorage.removeItem('selectedMine');
+    setRecentBlasts([]);
   };
+
+  const handleDeleteClick = (record: BlastRecord | null, all: boolean = false) => {
+    setRecordToDelete(record);
+    setDeleteAllMode(all);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      if (deleteAllMode) {
+        const response = await fetch(`http://localhost:5000/delete-blast-records?mine=${historyAuth.selectedMine}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to delete records');
+        }
+  
+        if (result.success) {
+          toast.success(`Deleted ${result.deleted_count} records`);
+          setRecentBlasts([]);
+        } else {
+          throw new Error(result.error || 'Deletion not confirmed by server');
+        }
+      } else if (recordToDelete) {
+        const response = await fetch(`http://localhost:5000/delete-blast-record`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mine: historyAuth.selectedMine,
+            date: recordToDelete.date,
+            time: recordToDelete.time,
+            location: recordToDelete.location
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to delete record');
+        }
+  
+        if (result.success) {
+          toast.success('Record deleted successfully');
+          // Use the composite key to filter since IDs might not match
+          setRecentBlasts(prev => prev.filter(blast => 
+            !(blast.date === recordToDelete.date && 
+              blast.time === recordToDelete.time && 
+              blast.location === recordToDelete.location)
+          ));
+        } else {
+          throw new Error(result.error || 'Deletion not confirmed by server');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      toast.error(error.message || 'Failed to delete record(s)');
+    } finally {
+      setDeleteDialogOpen(false);
+      setRecordToDelete(null);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -146,7 +225,7 @@ const loadBlastData = async (mine: string) => {
   }
 
   if (!isAuthenticated) {
-    return null; // Will redirect via useEffect
+    return null;
   }
 
   return (
@@ -159,30 +238,17 @@ const loadBlastData = async (mine: string) => {
           </p>
         </header>
 
-        <Tabs 
-          value={activeTab} 
-          onValueChange={setActiveTab}
-          className="space-y-6"
-        >
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-gray-100 dark:bg-gray-800 p-1">
-            <TabsTrigger 
-              value="predict"
-              className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-950 data-[state=active]:text-primary data-[state=active]:shadow-sm"
-            >
+            <TabsTrigger value="predict" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-950 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <BarChart3 className="h-4 w-4 mr-2" />
               Predict Damage
             </TabsTrigger>
-            <TabsTrigger 
-              value="data"
-              className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-950 data-[state=active]:text-primary data-[state=active]:shadow-sm"
-            >
+            <TabsTrigger value="data" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-950 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <Database className="h-4 w-4 mr-2" />
               Record Data
             </TabsTrigger>
-            <TabsTrigger 
-              value="history"
-              className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-950 data-[state=active]:text-primary data-[state=active]:shadow-sm"
-            >
+            <TabsTrigger value="history" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-950 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <BookOpen className="h-4 w-4 mr-2" />
               Blast History
             </TabsTrigger>
@@ -295,13 +361,24 @@ const loadBlastData = async (mine: string) => {
                     <CardTitle className="text-xl font-medium">
                       Recent Blast Records for {historyAuth.selectedMine}
                     </CardTitle>
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={handleHistoryLogout}
-                    >
-                      Logout
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => handleDeleteClick(null, true)}
+                        disabled={recentBlasts.length === 0}
+                      >
+                        Delete All Records
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={handleHistoryLogout}
+                      >
+                        Logout
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -315,39 +392,48 @@ const loadBlastData = async (mine: string) => {
                         <thead>
                           <tr className="border-b border-gray-200 dark:border-gray-800">
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Date</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Time</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Location</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Measured PPV</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Notes</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Damage Level</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {recentBlasts.map((blast) => {
-                            const mineName = blast.mineId === 1 ? 'Jayanta OCP' : blast.mineId === 2 ? 'Khadia OCP' : 'Beena OCP';
-                            
-                            return (
-                              <tr 
-                                key={blast.id} 
-                                className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
-                              >
-                                <td className="px-4 py-3 text-sm">{blast.date}</td>
-                                <td className="px-4 py-3 text-sm">{blast.location}</td>
-                                <td className="px-4 py-3 text-sm">{blast.measuredPPV} mm/s</td>
-                                <td className="px-4 py-3 text-sm">
-                                  <span 
-                                    className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                                      blast.damageLevel === 'None' 
-                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                        : blast.damageLevel === 'Minor' 
-                                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' 
-                                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                                    }`}
-                                  >
-                                    {blast.damageLevel}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
+                          {recentBlasts.map((blast) => (
+                            <tr 
+                              key={blast.id} 
+                              className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                            >
+                              <td className="px-4 py-3 text-sm">{blast.date}</td>
+                              <td className="px-4 py-3 text-sm">{blast.time || 'N/A'}</td>
+                              <td className="px-4 py-3 text-sm">{blast.location}</td>
+                              <td className="px-4 py-3 text-sm">{blast.measuredPPV} mm/s</td>
+                              <td className="px-4 py-3 text-sm">{blast.notes}</td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                  blast.damageLevel === 'None' 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                    : blast.damageLevel === 'Minor' 
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' 
+                                    : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                                }`}>
+                                  {blast.damageLevel}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-red-500 hover:text-red-700"
+                                  onClick={() => handleDeleteClick(blast)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -357,6 +443,30 @@ const loadBlastData = async (mine: string) => {
             )}
           </TabsContent>
         </Tabs>
+
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {deleteAllMode ? 'Delete all records?' : 'Delete this record?'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteAllMode 
+                  ? `This will permanently delete all blast records for ${historyAuth.selectedMine}. This action cannot be undone.`
+                  : `This will permanently delete the record from ${recordToDelete?.date} at ${recordToDelete?.location}. This action cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                className="bg-red-500 hover:bg-red-600"
+                onClick={confirmDelete}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPV Predictor</title>
+    <script>
+        // Prevent form resubmission on page refresh
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+    </script>
+</head>
+<body style="font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f4; padding: 20px;">
+
+    <h1 style="color: #333;">PPV Predictor</h1>
+
+    <form method="POST" action="/" 
+        style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); display: inline-block;">
+
+        <label for="distance" style="font-weight: bold;">Distance (m):</label>
+        <input type="text" id="distance" name="distance" 
+            style="margin: 10px 0; padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 4px;"><br><br>
+        
+        <label for="max_charge_weight" style="font-weight: bold;">Maximum charge weight per delay (kg):</label>
+        <input type="text" id="max_charge_weight" name="max_charge_weight" 
+            style="margin: 10px 0; padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 4px;"><br><br>
+        
+        <input type="submit" value="Predict" 
+            style="background-color: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">
+    </form>
+
+    {% if predicted_ppv %}
+    <h2 style="color: #d9534f; margin-top: 20px;">Predicted PPV: {{ predicted_ppv }}</h2>
+    {% endif %}
+
+</body>
+</html>

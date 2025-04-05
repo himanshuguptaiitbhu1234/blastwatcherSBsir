@@ -44,16 +44,17 @@ const BlastForm = () => {
     return { level: 'Extreme', description: 'Building collapse possible' };
   };
 
-  const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
+  const handleNumberInput = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
     const value = e.target.value;
-    if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
-      setter(value);
-    }
+    setter(value)
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!distance || !maxChargeWeight || parseFloat(distance) <= 0 || parseFloat(maxChargeWeight) <= 0) {
       toast.error("Please enter valid distance and charge weight (must be > 0)");
       return;
@@ -79,17 +80,32 @@ const BlastForm = () => {
         frequency: frequency ? parseFloat(frequency) : 0,
       };
 
+
       // Single API call for both PPV and SD
       const { predicted_ppv, predicted_sd } = await predictBlastValues(formData);
 
       const { level, description } = getDamageLevel(predicted_ppv);
-      setResult({ 
-        ppv: predicted_ppv, 
-        damageLevel: level, 
-        description, 
-        sd: predicted_sd 
+      setResult({
+        ppv: predicted_ppv,
+        damageLevel: level,
+        description,
+        sd: predicted_sd
       });
-      
+
+      setSelectedMine("");
+      setDistance("");
+      setMaxChargeWeight("");
+      setBurden("");
+      setSpacing("");
+      setDepth("");
+      setStemming("");
+      setTotalChargeLength("");
+      setExplosivePerHole("");
+      setTotalExplosive("");
+      setTotalRockBlasted("");
+      setPowderFactor("");
+      setFrequency("");
+
       toast.success("Prediction completed successfully!");
     } catch (error) {
       toast.error("Failed to get prediction. Please try again.");
@@ -107,7 +123,7 @@ const BlastForm = () => {
             <div className="mb-4">
               <MineSelector selectedMine={selectedMine} onChange={setSelectedMine} />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2 md:col-span-2 bg-primary/5 p-4 rounded-lg border border-primary/20">
                 <h3 className="font-semibold text-primary">Required Parameters</h3>
@@ -125,7 +141,7 @@ const BlastForm = () => {
                       step="any"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="maxChargeWeight">Max Charge Weight per Delay (kg)</Label>
                     <Input
@@ -141,7 +157,7 @@ const BlastForm = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Additional parameters */}
               {[
                 { id: 'burden', label: 'Burden (m)', value: burden, setter: setBurden },
@@ -169,9 +185,9 @@ const BlastForm = () => {
                 </div>
               ))}
             </div>
-            
-            <Button 
-              type="submit" 
+
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2 transition-all duration-200"
               disabled={isCalculating}
             >
@@ -180,7 +196,7 @@ const BlastForm = () => {
           </form>
         </CardContent>
       </Card>
-      
+
       {showAnimation && (
         <div className={`transition-all duration-500 ${isCalculating ? 'opacity-100' : ''}`}>
           <ResultDisplay result={result} isLoading={isCalculating} />

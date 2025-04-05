@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { blastRecords } from '@/lib/mockData';
 import BlastForm from '@/components/BlastForm';
 import DataEntryForm from '@/components/DataEntryForm';
 import { BarChart3, BookOpen, Database, Trash2 } from 'lucide-react';
@@ -46,70 +45,109 @@ interface BlastRecord {
   damageLevel: string;
 }
 
+const ScrollRestoration = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const savedScrollPositions = JSON.parse(
+      localStorage.getItem('scrollPositions') || '{}'
+    );
+    const scrollY = savedScrollPositions[location.key] || 0;
+    window.scrollTo(0, scrollY);
+  }, [location.key]);
+
+  useEffect(() => {
+    const saveScrollPosition = () => {
+      const scrollPositions = JSON.parse(
+        localStorage.getItem('scrollPositions') || '{}'
+      );
+      scrollPositions[location.key] = window.scrollY;
+      localStorage.setItem('scrollPositions', JSON.stringify(scrollPositions));
+    };
+
+    window.addEventListener('beforeunload', saveScrollPosition);
+    return () => {
+      window.removeEventListener('beforeunload', saveScrollPosition);
+    };
+  }, [location.key]);
+
+  return null;
+};
+
 const Dashboard = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('predict');
+  const location = useLocation();
+  
+  // Initialize activeTab from localStorage or default to 'predict'
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('activeTab');
+    return savedTab || 'predict';
+  });
+
   const [recentBlasts, setRecentBlasts] = useState<BlastRecord[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<BlastRecord | null>(null);
   const [deleteAllMode, setDeleteAllMode] = useState(false);
   
-  const [historyAuth, setHistoryAuth] = useState({
-    isLoggedIn: false,
-    username: '',
-    password: '',
-    selectedMine: ''
+  const [historyAuth, setHistoryAuth] = useState(() => {
+    const loggedIn = localStorage.getItem('historyLoggedIn') === 'true';
+    const savedMine = localStorage.getItem('selectedMine') || '';
+    const savedUsername = localStorage.getItem('historyUsername') || '';
+    
+    return {
+      isLoggedIn: loggedIn,
+      username: savedUsername,
+      password: '',
+      selectedMine: savedMine
+    };
   });
+
+  // Persist activeTab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!isAuthenticated && !isLoading) {
       navigate('/login');
     }
 
-    const loggedIn = localStorage.getItem('historyLoggedIn');
-    const savedMine = localStorage.getItem('selectedMine');
-    if (loggedIn === 'true' && savedMine) {
-      setHistoryAuth(prev => ({
-        ...prev,
-        isLoggedIn: true,
-        selectedMine: savedMine
+    if (historyAuth.isLoggedIn && historyAuth.selectedMine) {
+      loadBlastData(historyAuth.selectedMine);
+    }
+  }, [isAuthenticated, isLoading, navigate, historyAuth.isLoggedIn, historyAuth.selectedMine]);
+
+  const loadBlastData = async (mine: string) => {
+    try {
+      const response = await fetch(`http://localhost:5000/get-blast-history?mine=${mine}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch blast history');
+      }
+      
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load blast data');
+      }
+
+      const formattedData = data.data.map((item: any, index: number) => ({
+        id: index + 1,
+        mineId: mines.find(m => m.name === item.mine)?.id || '1',
+        date: item.date,
+        time: item.time || '',
+        location: item.location,
+        measuredPPV: item.measuredPPV,
+        damageLevel: getDamageLevel(item.measuredPPV),
+        notes: item.notes || ''
       }));
-      loadBlastData(savedMine);
+      
+      setRecentBlasts(formattedData);
+    } catch (error) {
+      console.error('Error loading blast data:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load blast history');
+      setRecentBlasts([]);
     }
-  }, [isAuthenticated, isLoading, navigate]);
-
-    // Also update your loadBlastData function to handle errors better:
-const loadBlastData = async (mine: string) => {
-  try {
-    const response = await fetch(`http://localhost:5000/get-blast-history?mine=${mine}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch blast history');
-    }
-    
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to load blast data');
-    }
-
-    const formattedData = data.data.map((item: any, index: number) => ({
-      id: index + 1,
-      mineId: mines.find(m => m.name === item.mine)?.id || '1',
-      date: item.date,
-      time: item.time || '',
-      location: item.location,
-      measuredPPV: item.measuredPPV,
-      damageLevel: getDamageLevel(item.measuredPPV),
-      notes: item.notes || ''
-    }));
-    
-    setRecentBlasts(formattedData);
-  } catch (error) {
-    console.error('Error loading blast data:', error);
-    toast.error(error.message || 'Failed to load blast history');
-    setRecentBlasts([]);
-  }
-};
+  };
 
   const getDamageLevel = (ppv: number) => {
     if (ppv < 5) return 'None';
@@ -120,9 +158,16 @@ const loadBlastData = async (mine: string) => {
   const handleHistoryLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (historyAuth.username === 'admin' && historyAuth.password === 'admin') {
-      setHistoryAuth(prev => ({ ...prev, isLoggedIn: true }));
+      const newAuthState = {
+        isLoggedIn: true,
+        username: historyAuth.username,
+        password: '',
+        selectedMine: historyAuth.selectedMine
+      };
+      setHistoryAuth(newAuthState);
       localStorage.setItem('historyLoggedIn', 'true');
       localStorage.setItem('selectedMine', historyAuth.selectedMine);
+      localStorage.setItem('historyUsername', historyAuth.username);
       loadBlastData(historyAuth.selectedMine);
       toast.success('Login successful');
     } else {
@@ -139,6 +184,7 @@ const loadBlastData = async (mine: string) => {
     });
     localStorage.removeItem('historyLoggedIn');
     localStorage.removeItem('selectedMine');
+    localStorage.removeItem('historyUsername');
     setRecentBlasts([]);
   };
 
@@ -192,7 +238,6 @@ const loadBlastData = async (mine: string) => {
   
         if (result.success) {
           toast.success('Record deleted successfully');
-          // Use the composite key to filter since IDs might not match
           setRecentBlasts(prev => prev.filter(blast => 
             !(blast.date === recordToDelete.date && 
               blast.time === recordToDelete.time && 
@@ -204,13 +249,12 @@ const loadBlastData = async (mine: string) => {
       }
     } catch (error) {
       console.error('Error deleting record:', error);
-      toast.error(error.message || 'Failed to delete record(s)');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete record(s)');
     } finally {
       setDeleteDialogOpen(false);
       setRecordToDelete(null);
     }
   };
-
 
   if (isLoading) {
     return (
@@ -230,6 +274,7 @@ const loadBlastData = async (mine: string) => {
 
   return (
     <div className="min-h-screen pt-16 pb-10 bg-gradient-to-b from-white to-gray-50 dark:from-gray-950 dark:to-gray-900">
+      <ScrollRestoration/>
       <div className="container mx-auto px-4 md:px-6 max-w-7xl">
         <header className="mb-8">
           <h1 className="text-3xl font-bold">User Dashboard</h1>
@@ -238,7 +283,14 @@ const loadBlastData = async (mine: string) => {
           </p>
         </header>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(value) => {
+            setActiveTab(value);
+            localStorage.setItem('activeTab', value);
+          }} 
+          className="space-y-6"
+        >
           <TabsList className="bg-gray-100 dark:bg-gray-800 p-1">
             <TabsTrigger value="predict" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-950 data-[state=active]:text-primary data-[state=active]:shadow-sm">
               <BarChart3 className="h-4 w-4 mr-2" />

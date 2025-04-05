@@ -43,6 +43,19 @@ interface BlastRecord {
   measuredPPV: number;
   notes: string;
   damageLevel: string;
+  bench:number;
+  distancefromblast: string;
+  burden: string;
+  spacing: string;
+  stemming: string;
+  holesPerRow: string;
+  noOfRows: string;
+  explosiveCharge: string;
+  explosiveType: string;
+  delayBetweenHoles: string;
+  delayBetweenRows: string;
+  frequency: string;
+  chargeWeight: string;
 }
 
 const ScrollRestoration = () => {
@@ -138,7 +151,9 @@ const Dashboard = () => {
         location: item.location,
         measuredPPV: item.measuredPPV,
         damageLevel: getDamageLevel(item.measuredPPV),
-        notes: item.notes || ''
+        notes: item.notes || '',
+        distancefromblast : item.distancefromblast,
+        burden : item.burden || '',
       }));
       
       setRecentBlasts(formattedData);
@@ -448,8 +463,9 @@ const Dashboard = () => {
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Location</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Measured PPV</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Notes</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Damage Level</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Burden</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Distance</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Blast damage level</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -463,6 +479,9 @@ const Dashboard = () => {
                               <td className="px-4 py-3 text-sm">{blast.location}</td>
                               <td className="px-4 py-3 text-sm">{blast.measuredPPV} mm/s</td>
                               <td className="px-4 py-3 text-sm">{blast.notes}</td>
+                              <td className="px-4 py-3 text-sm">{blast.burden}</td>
+                              <td className="px-4 py-3 text-sm">{blast.distancefromblast}</td>
+
                               <td className="px-4 py-3 text-sm">
                                 <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                                   blast.damageLevel === 'None' 

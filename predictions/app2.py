@@ -17,9 +17,10 @@ MONGO_URI = os.getenv("MONGO_URI")
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, resources={
-    r"/*": {"origins": "*"}  # For development only, restrict in production
-})
+# CORS(app, resources={
+#     r"/*": {"origins": "*"}  # For development only, restrict in production
+# })
+CORS(app)
 
 # Connect to MongoDB
 try:
@@ -77,7 +78,7 @@ def train_model():
     
     try:
         test_size = 0.2 if len(X) > 10 else 0.0
-        if test_size > 0:
+        if test_size > 0.0:
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
         else:
             X_train, y_train = X, y
@@ -87,6 +88,7 @@ def train_model():
         new_model.fit(X_train, y_train)
         
         if X_test is not None and y_test is not None:
+            # print("hi")
             y_pred = new_model.predict(X_test)
             y_pred_after_exp = np.exp(y_pred)
             y_test_after_exp = np.exp(y_test)
@@ -242,7 +244,7 @@ def get_blast_history():
         
         measurements = list(measurements_collection.find(
             {"mine": mine_name},
-            {"_id": 0, "mine": 1, "date": 1, "time": 1, "location": 1, "measuredPPV": 1, "notes": 1}
+            {"_id": 0, "mine": 1, "date": 1, "time": 1, "location": 1, "measuredPPV": 1, "notes": 1, "distancefromblast": 1, "drilldia": 1, "bench": 1, "burden": 1, "spacing": 1, "stemming": 1, "holesPerRow": 1, "noOfRows": 1, "explosiveCharge": 1, "explosiveType": 1, "delayBetweenHoles": 1, "delayBetweenRows": 1, "frequency": 1, "chargeWeight": 1}
         ).sort("date", -1))
         
         return jsonify({
@@ -252,6 +254,52 @@ def get_blast_history():
         
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+    
+@app.route('/delete-blast-record', methods=['DELETE'])
+def delete_blast_record():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+        mine = data.get('mine')
+        date = data.get('date')
+        time = data.get('time', '')
+        location = data.get('location')
+        
+        if not all([mine, date, location]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+            
+        query = {
+            "mine": mine,
+            "date": date,
+            "location": location
+        }
+        
+        if time:
+            query["time"] = time
+            
+        result = measurements_collection.delete_one(query)
+        
+        if result.deleted_count == 0:
+            return jsonify({
+                'success': False,
+                'error': 'Record not found',
+                'deleted_count': 0
+            }), 404
+            
+        return jsonify({
+            'success': True,
+            'message': 'Record deleted successfully',
+            'deleted_count': result.deleted_count
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Server error: {str(e)}'
+        }), 500
+
 
 @app.route('/get-training-data', methods=['GET'])
 def get_training_data():

@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import BlastForm from '@/components/BlastForm';
 import DataEntryForm from '@/components/DataEntryForm';
-import { BarChart3, BookOpen, Database, Trash2 } from 'lucide-react';
+import { BarChart3, BookOpen, Database, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -43,19 +43,21 @@ interface BlastRecord {
   measuredPPV: number;
   notes: string;
   damageLevel: string;
-  bench:number;
+  bench: number;
   distancefromblast: string;
   burden: string;
   spacing: string;
   stemming: string;
-  holesPerRow: string;
-  noOfRows: string;
-  explosiveCharge: string;
-  explosiveType: string;
-  delayBetweenHoles: string;
-  delayBetweenRows: string;
+  holesperrow: string;
+  noofrows: string;
+  explosivecharge: string;
+  Explosivetype: string;
+  Delaybetweenholes: string;
+  Delaybetweenrows: string;
   frequency: string;
   chargeWeight: string;
+  subgrade: string;
+  drilldia: string;
 }
 
 const ScrollRestoration = () => {
@@ -92,7 +94,6 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Initialize activeTab from localStorage or default to 'predict'
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('activeTab');
     return savedTab || 'predict';
@@ -102,6 +103,7 @@ const Dashboard = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<BlastRecord | null>(null);
   const [deleteAllMode, setDeleteAllMode] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<number[]>([]);
   
   const [historyAuth, setHistoryAuth] = useState(() => {
     const loggedIn = localStorage.getItem('historyLoggedIn') === 'true';
@@ -116,7 +118,6 @@ const Dashboard = () => {
     };
   });
 
-  // Persist activeTab to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
@@ -152,8 +153,21 @@ const Dashboard = () => {
         measuredPPV: item.measuredPPV,
         damageLevel: getDamageLevel(item.measuredPPV),
         notes: item.notes || '',
-        distancefromblast : item.distancefromblast,
-        burden : item.burden || '',
+        distancefromblast: item.distancefromblast || '',
+        burden: item.burden || '',
+        subgrade: item.subgrade || '',
+        chargeWeight: item.chargeWeight || '',
+        drilldia: item.drilldia || '',
+        bench: item.bench || '',
+        spacing: item.spacing || '',
+        stemming: item.stemming || '',
+        holesperrow: item.holesperrow || '',
+        noofrows: item.noofrows || '',
+        explosivecharge: item.explosivecharge || '',
+        Explosivetype: item.Explosivetype || '',
+        Delaybetweenholes: item.Delaybetweenholes || '',
+        Delaybetweenrows: item.Delaybetweenrows || '',
+        frequency: item.frequency || '',
       }));
       
       setRecentBlasts(formattedData);
@@ -201,12 +215,21 @@ const Dashboard = () => {
     localStorage.removeItem('selectedMine');
     localStorage.removeItem('historyUsername');
     setRecentBlasts([]);
+    setExpandedRows([]);
   };
 
   const handleDeleteClick = (record: BlastRecord | null, all: boolean = false) => {
     setRecordToDelete(record);
     setDeleteAllMode(all);
     setDeleteDialogOpen(true);
+  };
+
+  const toggleRow = (id: number) => {
+    setExpandedRows(prev => 
+      prev.includes(id) 
+        ? prev.filter(rowId => rowId !== id) 
+        : [...prev, id]
+    );
   };
 
   const confirmDelete = async () => {
@@ -228,6 +251,7 @@ const Dashboard = () => {
         if (result.success) {
           toast.success(`Deleted ${result.deleted_count} records`);
           setRecentBlasts([]);
+          setExpandedRows([]);
         } else {
           throw new Error(result.error || 'Deletion not confirmed by server');
         }
@@ -258,6 +282,7 @@ const Dashboard = () => {
               blast.time === recordToDelete.time && 
               blast.location === recordToDelete.location)
           ));
+          setExpandedRows(prev => prev.filter(id => id !== recordToDelete.id));
         } else {
           throw new Error(result.error || 'Deletion not confirmed by server');
         }
@@ -424,7 +449,7 @@ const Dashboard = () => {
             ) : (
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                     <CardTitle className="text-xl font-medium">
                       Recent Blast Records for {historyAuth.selectedMine}
                     </CardTitle>
@@ -458,52 +483,132 @@ const Dashboard = () => {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr className="border-b border-gray-200 dark:border-gray-800">
+                            <th className="w-8"></th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Date</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Time</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Location</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Measured PPV</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Notes</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Burden</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Distance</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Blast damage level</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">PPV (mm/s)</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Damage</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {recentBlasts.map((blast) => (
-                            <tr 
-                              key={blast.id} 
-                              className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
-                            >
-                              <td className="px-4 py-3 text-sm">{blast.date}</td>
-                              <td className="px-4 py-3 text-sm">{blast.time || 'N/A'}</td>
-                              <td className="px-4 py-3 text-sm">{blast.location}</td>
-                              <td className="px-4 py-3 text-sm">{blast.measuredPPV} mm/s</td>
-                              <td className="px-4 py-3 text-sm">{blast.notes}</td>
-                              <td className="px-4 py-3 text-sm">{blast.burden}</td>
-                              <td className="px-4 py-3 text-sm">{blast.distancefromblast}</td>
-
-                              <td className="px-4 py-3 text-sm">
-                                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                                  blast.damageLevel === 'None' 
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                    : blast.damageLevel === 'Minor' 
-                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' 
-                                    : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                                }`}>
-                                  {blast.damageLevel}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="text-red-500 hover:text-red-700"
-                                  onClick={() => handleDeleteClick(blast)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </td>
-                            </tr>
+                            <React.Fragment key={blast.id}>
+                              <tr 
+                                className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                              >
+                                <td className="px-1 py-3">
+                                  <button 
+                                    onClick={() => toggleRow(blast.id)}
+                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                  >
+                                    {expandedRows.includes(blast.id) ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3 text-sm">{blast.date}</td>
+                                <td className="px-4 py-3 text-sm">{blast.time || 'N/A'}</td>
+                                <td className="px-4 py-3 text-sm">{blast.location}</td>
+                                <td className="px-4 py-3 text-sm">{blast.measuredPPV}</td>
+                                <td className="px-4 py-3 text-sm">
+                                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                    blast.damageLevel === 'None' 
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                      : blast.damageLevel === 'Minor' 
+                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' 
+                                      : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                                  }`}>
+                                    {blast.damageLevel}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="text-red-500 hover:text-red-700"
+                                    onClick={() => handleDeleteClick(blast)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                              {expandedRows.includes(blast.id) && (
+                                <tr className="bg-gray-50 dark:bg-gray-900/30">
+                                  <td colSpan={7} className="px-4 py-3">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-sm">
+                                      <div>
+                                        <p className="font-medium">Distance from blast:</p>
+                                        <p>{blast.distancefromblast || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Burden:</p>
+                                        <p>{blast.burden || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Subgrade:</p>
+                                        <p>{blast.subgrade || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Charge Weight:</p>
+                                        <p>{blast.chargeWeight || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Drill Diameter:</p>
+                                        <p>{blast.drilldia || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Bench:</p>
+                                        <p>{blast.bench || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Spacing:</p>
+                                        <p>{blast.spacing || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Stemming:</p>
+                                        <p>{blast.stemming || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Holes per row:</p>
+                                        <p>{blast.holesperrow || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Number of rows:</p>
+                                        <p>{blast.noofrows || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Explosive Charge:</p>
+                                        <p>{blast.explosivecharge || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Explosive Type:</p>
+                                        <p>{blast.Explosivetype || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Delay between holes (ms):</p>
+                                        <p>{blast.Delaybetweenholes || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Delay between rows (ms):</p>
+                                        <p>{blast.Delaybetweenrows || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Frequency (Hz):</p>
+                                        <p>{blast.frequency || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">Notes:</p>
+                                        <p>{blast.notes || 'N/A'}</p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           ))}
                         </tbody>
                       </table>

@@ -244,7 +244,8 @@ def get_blast_history():
         
         measurements = list(measurements_collection.find(
             {"mine": mine_name},
-            {"_id": 0, "mine": 1, "date": 1, "time": 1, "location": 1, "measuredPPV": 1, "notes": 1, "distancefromblast": 1, "drilldia": 1, "bench": 1, "burden": 1, "spacing": 1, "stemming": 1, "holesPerRow": 1, "noOfRows": 1, "explosiveCharge": 1, "explosiveType": 1, "delayBetweenHoles": 1, "delayBetweenRows": 1, "frequency": 1, "chargeWeight": 1}
+            {"_id": 0, "mine": 1, "date": 1, "time": 1, "location": 1, "measuredPPV": 1, "notes": 1, "distancefromblast": 1, "drilldia": 1, "bench": 1, "burden": 1, "spacing": 1, "stemming": 1, "holesPerRow": 1, "noOfRows": 1, "explosiveCharge": 1, "explosiveType": 1, "delayBetweenHoles": 1, "delayBetweenRows": 1, "frequency": 1, "chargeWeight": 1, "subgrade": 1, "holesperrow": 1,"noofrows":1,
+             "explosivecharge":1,"Explosivetype":1,"Delaybetweenholes":1,"Delaybetweenrows":1}
         ).sort("date", -1))
         
         return jsonify({

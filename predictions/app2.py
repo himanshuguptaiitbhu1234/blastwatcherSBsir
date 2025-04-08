@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
+from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
@@ -10,6 +11,8 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 from bson import ObjectId
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
 
 # Load environment variables
 load_dotenv()
@@ -37,8 +40,75 @@ except Exception as e:
 model = None
 current_training_count = 0
 
+# def prepare_training_data():
+#     """Fetch training data from MongoDB and prepare it for model training"""
+#     try:
+#         training_data = list(training_data_collection.find({}))
+        
+#         if not training_data:
+#             print("⚠️ No training data available in MongoDB")
+#             return None, None, None
+        
+#         df = pd.DataFrame(training_data)
+        
+#         # Apply logarithmic transformations
+#         df['Distance_log'] = np.log(df['Distance (m)'])
+#         df['Max_Charge_log'] = np.log(df['Maximum charge weight per delay (kg)'])
+#         df['PPV_log'] = np.log(df['PPV'])
+        
+#         X = df[['Distance_log', 'Max_Charge_log']]
+#         y = df['PPV_log']
+        
+#         return X, y, df
+    
+#     except Exception as e:
+#         print(f"❌ Error preparing training data: {e}")
+#         return None, None, None
+
+# def train_model():
+#     """Train or retrain the model with current data"""
+#     global model, current_training_count
+    
+#     X, y, df = prepare_training_data()
+#     if X is None or y is None:
+#         print("⚠️ Not enough data to train model")
+#         model = None
+#         current_training_count = 0
+#         return False
+    
+#     if len(X) == current_training_count:
+#         return True
+    
+#     try:
+#         test_size = 0.2 if len(X) > 10 else 0.0
+#         if test_size > 0.0:
+#             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+#         else:
+#             X_train, y_train = X, y
+#             X_test, y_test = None, None
+        
+#         new_model = LinearRegression()
+#         new_model.fit(X_train, y_train)
+        
+#         if X_test is not None and y_test is not None:
+#             # print("hi")
+#             y_pred = new_model.predict(X_test)
+#             y_pred_after_exp = np.exp(y_pred)
+#             y_test_after_exp = np.exp(y_test)
+#             r2 = r2_score(y_test_after_exp, y_pred_after_exp)
+#             print(f'📊 Model R² Score: {r2:.4f} (Trained on {len(X_train)} samples)')
+        
+#         model = new_model
+#         current_training_count = len(X)
+#         return True
+    
+#     except Exception as e:
+#         print(f"❌ Model training failed: {e}")
+#         model = None
+#         return False
+
 def prepare_training_data():
-    """Fetch training data from MongoDB and prepare it for model training"""
+    """Fetch training data from MongoDB and prepare it for model training, including mine information"""
     try:
         training_data = list(training_data_collection.find({}))
         
@@ -53,7 +123,15 @@ def prepare_training_data():
         df['Max_Charge_log'] = np.log(df['Maximum charge weight per delay (kg)'])
         df['PPV_log'] = np.log(df['PPV'])
         
-        X = df[['Distance_log', 'Max_Charge_log']]
+        # Ensure 'Mine' column exists and handle missing values
+        if 'Mine' not in df.columns:
+            print("⚠️ Mine information not found in data - using generic model")
+            df['Mine'] = 'unknown'
+        else:
+            df['Mine'] = df['Mine'].fillna('unknown')
+        
+        # Prepare features - now including Mine
+        X = df[['Distance_log', 'Max_Charge_log', 'Mine']]
         y = df['PPV_log']
         
         return X, y, df
@@ -63,8 +141,8 @@ def prepare_training_data():
         return None, None, None
 
 def train_model():
-    """Train or retrain the model with current data"""
-    global model, current_training_count
+    """Train or retrain the model with current data, including mine-specific factors"""
+    global model, current_training_count, preprocessor
     
     X, y, df = prepare_training_data()
     if X is None or y is None:
@@ -78,24 +156,45 @@ def train_model():
     
     try:
         test_size = 0.2 if len(X) > 10 else 0.0
+        
+        # Define preprocessing for numerical and categorical features
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('num', 'passthrough', ['Distance_log', 'Max_Charge_log']),
+                ('cat', OneHotEncoder(handle_unknown='ignore'), ['Mine'])
+            ])
+        
+        # Create pipeline with preprocessing and model
+        pipeline = Pipeline([
+            ('preprocessor', preprocessor),
+            ('regressor', LinearRegression())
+        ])
+        
         if test_size > 0.0:
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
-        else:
-            X_train, y_train = X, y
-            X_test, y_test = None, None
-        
-        new_model = LinearRegression()
-        new_model.fit(X_train, y_train)
-        
-        if X_test is not None and y_test is not None:
-            # print("hi")
-            y_pred = new_model.predict(X_test)
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=test_size, random_state=42)
+            pipeline.fit(X_train, y_train)
+            
+            # Evaluation
+            y_pred = pipeline.predict(X_test)
             y_pred_after_exp = np.exp(y_pred)
             y_test_after_exp = np.exp(y_test)
             r2 = r2_score(y_test_after_exp, y_pred_after_exp)
+            
+            # Get feature names after one-hot encoding
+            feature_names = (['Distance_log', 'Max_Charge_log'] + 
+                           list(pipeline.named_steps['preprocessor']
+                               .named_transformers_['cat']
+                               .get_feature_names_out(['Mine'])))
+            
             print(f'📊 Model R² Score: {r2:.4f} (Trained on {len(X_train)} samples)')
+            print('🔍 Model coefficients:')
+            for name, coef in zip(feature_names, pipeline.named_steps['regressor'].coef_):
+                print(f'{name}: {coef:.4f}')
+        else:
+            pipeline.fit(X, y)
         
-        model = new_model
+        model = pipeline
         current_training_count = len(X)
         return True
     
@@ -172,6 +271,7 @@ def save_measurement():
 
         # Add to training data
         training_doc = {
+            'Mine': (data["mine"]),
             'Distance (m)': float(data["distancefromblast"]),
             'Maximum charge weight per delay (kg)': float(data["chargeWeight"]),
             'PPV': float(data["measuredPPV"]),
@@ -201,18 +301,33 @@ def predict():
         data = request.get_json()
         distance = data.get('distance', 0)
         max_charge_weight = data.get('maxChargeWeight', 0)
+        mine = data.get('selectedMine', 'unknown')  # Default to 'unknown' if not provided
 
         if float(distance) <= 0 or float(max_charge_weight) <= 0:
             return jsonify({'error': 'Invalid input values'}), 400
 
-        predicted_ppv = predict_ppv(distance, max_charge_weight)
+        try:
+            # Create a DataFrame with the same structure as training data
+            input_data = pd.DataFrame({
+                'Distance_log': [np.log(float(distance))],
+                'Max_Charge_log': [np.log(float(max_charge_weight))],
+                'Mine': [mine]
+            })
+            
+            # Make prediction
+            predicted_ppv_log = model.predict(input_data)[0]
+            predicted_ppv = float(np.exp(predicted_ppv_log))
+        except Exception as e:
+            print("❌ Prediction error:", e)
+            return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
+
         predicted_sd = predict_sd(distance, max_charge_weight)
 
-        if predicted_ppv is None or predicted_sd is None:
-            return jsonify({'error': 'Prediction failed'}), 500
+        if predicted_sd is None:
+            return jsonify({'error': 'SD calculation failed'}), 500
 
         prediction_data = {
-            "selected_mine": data.get("selectedMine", ""),
+            "selected_mine": mine,
             "Distance from Blast Site (m)": float(distance),
             "Maximum Charge Weight per Delay (kg)": float(max_charge_weight),
             "predicted_ppv": predicted_ppv,

@@ -135,25 +135,9 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
           
-          <Card className="bg-white dark:bg-gray-950 shadow-sm">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Users</p>
-                <p className="text-2xl font-bold">2</p>
-              </div>
-              <Users className="h-8 w-8 text-green-500 opacity-80" />
-            </CardContent>
-          </Card>
+        
           
-          <Card className="bg-white dark:bg-gray-950 shadow-sm">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Damage Incidents</p>
-                <p className="text-2xl font-bold">3</p>
-              </div>
-              <AlertCircle className="h-8 w-8 text-red-500 opacity-80" />
-            </CardContent>
-          </Card>
+          
         </div>
 
         <Tabs 

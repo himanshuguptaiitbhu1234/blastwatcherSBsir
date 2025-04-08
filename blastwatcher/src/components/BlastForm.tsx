@@ -55,6 +55,10 @@ const BlastForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if(!selectedMine){
+      toast.error("Please select a mine")
+      return
+    }
     if (!distance || !maxChargeWeight || parseFloat(distance) <= 0 || parseFloat(maxChargeWeight) <= 0) {
       toast.error("Please enter valid distance and charge weight (must be > 0)");
       return;

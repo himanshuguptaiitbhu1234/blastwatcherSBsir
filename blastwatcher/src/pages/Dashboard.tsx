@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -93,7 +93,7 @@ const Dashboard = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('activeTab');
     return savedTab || 'predict';
@@ -104,12 +104,12 @@ const Dashboard = () => {
   const [recordToDelete, setRecordToDelete] = useState<BlastRecord | null>(null);
   const [deleteAllMode, setDeleteAllMode] = useState(false);
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
-  
+
   const [historyAuth, setHistoryAuth] = useState(() => {
     const loggedIn = localStorage.getItem('historyLoggedIn') === 'true';
     const savedMine = localStorage.getItem('selectedMine') || '';
     const savedUsername = localStorage.getItem('historyUsername') || '';
-    
+
     return {
       isLoggedIn: loggedIn,
       username: savedUsername,
@@ -138,7 +138,7 @@ const Dashboard = () => {
       if (!response.ok) {
         throw new Error('Failed to fetch blast history');
       }
-      
+
       const data = await response.json();
       if (!data.success) {
         throw new Error(data.error || 'Failed to load blast data');
@@ -169,7 +169,7 @@ const Dashboard = () => {
         Delaybetweenrows: item.Delaybetweenrows || '',
         frequency: item.frequency || '',
       }));
-      
+
       setRecentBlasts(formattedData);
     } catch (error) {
       console.error('Error loading blast data:', error);
@@ -225,9 +225,9 @@ const Dashboard = () => {
   };
 
   const toggleRow = (id: number) => {
-    setExpandedRows(prev => 
-      prev.includes(id) 
-        ? prev.filter(rowId => rowId !== id) 
+    setExpandedRows(prev =>
+      prev.includes(id)
+        ? prev.filter(rowId => rowId !== id)
         : [...prev, id]
     );
   };
@@ -241,13 +241,13 @@ const Dashboard = () => {
             'Content-Type': 'application/json',
           }
         });
-        
+
         const result = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(result.error || 'Failed to delete records');
         }
-  
+
         if (result.success) {
           toast.success(`Deleted ${result.deleted_count} records`);
           setRecentBlasts([]);
@@ -268,18 +268,18 @@ const Dashboard = () => {
             location: recordToDelete.location
           })
         });
-        
+
         const result = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(result.error || 'Failed to delete record');
         }
-  
+
         if (result.success) {
           toast.success('Record deleted successfully');
-          setRecentBlasts(prev => prev.filter(blast => 
-            !(blast.date === recordToDelete.date && 
-              blast.time === recordToDelete.time && 
+          setRecentBlasts(prev => prev.filter(blast =>
+            !(blast.date === recordToDelete.date &&
+              blast.time === recordToDelete.time &&
               blast.location === recordToDelete.location)
           ));
           setExpandedRows(prev => prev.filter(id => id !== recordToDelete.id));
@@ -314,7 +314,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen pt-16 pb-10 bg-gradient-to-b from-white to-gray-50 dark:from-gray-950 dark:to-gray-900">
-      <ScrollRestoration/>
+      <ScrollRestoration />
       <div className="container mx-auto px-4 md:px-6 max-w-7xl">
         <header className="mb-8">
           <h1 className="text-3xl font-bold">User Dashboard</h1>
@@ -323,12 +323,12 @@ const Dashboard = () => {
           </p>
         </header>
 
-        <Tabs 
-          value={activeTab} 
+        <Tabs
+          value={activeTab}
           onValueChange={(value) => {
             setActiveTab(value);
             localStorage.setItem('activeTab', value);
-          }} 
+          }}
           className="space-y-6"
         >
           <TabsList className="bg-gray-100 dark:bg-gray-800 p-1">
@@ -355,7 +355,7 @@ const Dashboard = () => {
           <TabsContent value="data" className="animate-fade-in">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <DataEntryForm />
-              
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-xl font-medium">Recording Guidelines</CardTitle>
@@ -363,10 +363,10 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="space-y-4 text-sm">
                     <p>
-                      Record accurate PPV measurements after each blast to improve prediction accuracy. 
+                      Record accurate PPV measurements after each blast to improve prediction accuracy.
                       Ensure readings are taken with calibrated equipment.
                     </p>
-                    
+
                     <div className="space-y-2">
                       <h3 className="font-semibold">Best Practices:</h3>
                       <ul className="list-disc pl-5 space-y-1">
@@ -376,7 +376,7 @@ const Dashboard = () => {
                         <li>Document the exact location of measurement points</li>
                       </ul>
                     </div>
-                    
+
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md">
                       <div className="font-medium text-blue-800 dark:text-blue-300 mb-1">Note:</div>
                       <p className="text-blue-700 dark:text-blue-400">
@@ -397,22 +397,25 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="mine-select">Select Mine</Label>
-                    <Select 
-                      value={historyAuth.selectedMine} 
-                      onValueChange={(value) => setHistoryAuth(prev => ({ ...prev, selectedMine: value }))}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a mine" />
-                      </SelectTrigger>
-                      <SelectContent>
+                    <Label htmlFor="mine-select" aria-required="true">
+                      Select Mine
+                      <select
+                        id="mine-select"
+                        value={historyAuth.selectedMine}
+                        onChange={(e) =>
+                          setHistoryAuth((prev) => ({ ...prev, selectedMine: e.target.value }))
+                        }
+                        className="w-full mt-1 p-2 border border-gray-300 rounded-md"
+                      >
+                        <option value="">Select a mine</option>
                         {mines.map((mine) => (
-                          <SelectItem key={mine.id} value={mine.name}>
+                          <option key={mine.id} value={mine.name}>
                             {mine.name}
-                          </SelectItem>
+                          </option>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </select>
+                    </Label>
+
                   </div>
 
                   {historyAuth.selectedMine && (
@@ -454,7 +457,7 @@ const Dashboard = () => {
                       Recent Blast Records for {historyAuth.selectedMine}
                     </CardTitle>
                     <div className="flex gap-2">
-                      <Button 
+                      <Button
                         variant="outline"
                         size="sm"
                         className="text-red-500 hover:text-red-700"
@@ -463,7 +466,7 @@ const Dashboard = () => {
                       >
                         Delete All Records
                       </Button>
-                      <Button 
+                      <Button
                         variant="outline"
                         size="sm"
                         onClick={handleHistoryLogout}
@@ -495,11 +498,11 @@ const Dashboard = () => {
                         <tbody>
                           {recentBlasts.map((blast) => (
                             <React.Fragment key={blast.id}>
-                              <tr 
+                              <tr
                                 className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50"
                               >
                                 <td className="px-1 py-3">
-                                  <button 
+                                  <button
                                     onClick={() => toggleRow(blast.id)}
                                     className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
                                   >
@@ -515,20 +518,19 @@ const Dashboard = () => {
                                 <td className="px-4 py-3 text-sm">{blast.location}</td>
                                 <td className="px-4 py-3 text-sm">{blast.measuredPPV}</td>
                                 <td className="px-4 py-3 text-sm">
-                                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                                    blast.damageLevel === 'None' 
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                      : blast.damageLevel === 'Minor' 
-                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' 
+                                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${blast.damageLevel === 'None'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : blast.damageLevel === 'Minor'
+                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
                                       : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                                  }`}>
+                                    }`}>
                                     {blast.damageLevel}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-sm">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
                                     className="text-red-500 hover:text-red-700"
                                     onClick={() => handleDeleteClick(blast)}
                                   >
@@ -627,14 +629,14 @@ const Dashboard = () => {
                 {deleteAllMode ? 'Delete all records?' : 'Delete this record?'}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {deleteAllMode 
+                {deleteAllMode
                   ? `This will permanently delete all blast records for ${historyAuth.selectedMine}. This action cannot be undone.`
                   : `This will permanently delete the record from ${recordToDelete?.date} at ${recordToDelete?.location}. This action cannot be undone.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 className="bg-red-500 hover:bg-red-600"
                 onClick={confirmDelete}
               >
